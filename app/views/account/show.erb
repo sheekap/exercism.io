@@ -1,0 +1,50 @@
+<div class="container">
+  <section class="page-header">
+    <h1>Account Settings</h1>
+  </section>
+  <article>
+    <h2>API key</h2>
+    <strong>Your API key is: </strong><%= current_user.key %>. <a href="/account/key">Reset it here.</a>
+
+    <hr>
+
+    <h2>Avatar</h2>
+      <p>You can update your <%= gravatar_tag current_user.avatar_url %> avatar on
+      <a href="https://github.com/settings/profile">GitHub</a>.</p>
+
+    <hr>
+
+    <h2>Teams</h2>
+    <% if profile.has_teams? %>
+      <ul class="nav nav-stacked nav-bordered" style="max-width: 400px">
+        <% profile.teams.each do |team| %>
+          <li>
+            <% if team.unconfirmed_members.include?(profile.user) %>
+              <ul class="list-inline" style="padding:10px 20px;">
+                <li>
+                  <form action="<%= "/teams/#{team.slug}/confirm" %>" method="post">
+                    <input type="hidden" name="_method" value="put" />
+                    <input type="submit" name="update" value="Accept" class="btn btn-xs btn-success"/>
+                  </form>
+                </li>
+                <li>
+                  <form action="<%= "/teams/#{team.slug}/leave" %>" method="post">
+                    <input type="hidden" name="_method" value="put" />
+                    <input type="submit" name="update" value="Decline" class="btn btn-xs btn-danger"/>
+                  </form>
+                </li>
+                <li style="padding-left: 0;"><%= team.name %></li>
+              </ul>
+            <% else %>
+              <a href="/teams/<%= team.slug %>"><%= team.name %></a>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+    <p/><br/>
+    <a href="/teams" class="btn btn-primary">Create a new team</a>
+  </div>
+    </div>
+  </article>
+</div>

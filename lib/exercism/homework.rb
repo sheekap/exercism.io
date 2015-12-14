@@ -5,15 +5,42 @@ class Homework
   end
 
   def all
-    sql = "SELECT language, slug, state FROM user_exercises WHERE user_id = #{user.id} ORDER BY language, slug ASC"
+    sql = <<-SQL
+    SELECT language, slug, archived
+    FROM user_exercises
+    WHERE user_id=#{user.id}
+    AND (iteration_count>0 OR skipped_at IS NOT NULL)
+    ORDER BY language, slug ASC
+    SQL
     extract(sql)
+  end
+
+  def status(language)
+    exercises = user.exercises.where(language: language)
+
+    skipped = exercises.where.not(skipped_at: nil).pluck(:slug)
+    fetched = exercises.where.not(fetched_at: nil).pluck(:slug)
+    recent = exercises.where.not(last_iteration_at: nil)
+             .order(:last_iteration_at).last
+
+    recent = Struct.new(:slug, :last_iteration_at).new("", "") if recent.nil?
+
+    {
+      track_id: language,
+      recent: {
+        problem: recent.slug,
+        submitted_at: recent.last_iteration_at
+      },
+      skipped: skipped,
+      fetched: fetched
+    }
   end
 
   private
 
   def extract(sql)
     UserExercise.connection.execute(sql).each_with_object(empty_hash) do |row, exercises|
-      exercises[row['language']] << { 'slug' => row['slug'], 'state' => row['state'] }
+      exercises[row['language']] << { 'slug' => row['slug'], 'state' => row['archived'] == 't' ? 'archived' : 'active' }
     end
   end
 

@@ -1,41 +1,35 @@
 require 'bundler'
 Bundler.setup
 require_relative '../test_helper'
+require_relative '../approval_helper'
 require 'exercism/markdown'
 require 'exercism/converts_markdown_to_html'
 require 'mocha/setup'
 
 class ConvertsMarkdownToHTMLTest < Minitest::Test
 
-  def check_sanitisation(input, expected)
+  def assert_converts_to(input, expected)
     converter = ConvertsMarkdownToHTML.new(input)
     converter.convert
     assert_equal expected, converter.content.strip
   end
 
-  def test_convert_class_method_calls_correct_methods
-    ConvertsMarkdownToHTML.any_instance.expects(:convert)
-    ConvertsMarkdownToHTML.any_instance.expects(:content)
-    ConvertsMarkdownToHTML.convert(nil)
-  end
-
-  def test_convert_calls_correct_methods
-    converter = ConvertsMarkdownToHTML.new(nil)
-    converter.expects(:convert_markdown_to_html)
-    converter.expects(:sanitize_html)
-    converter.convert
-  end
-
   def test_sanitisation
     input = "<script type=\"text/javascript\">bad();</script>good"
     expected = "<p>&lt;script type=\"text/javascript\"&gt;bad();&lt;/script&gt;good</p>"
-    check_sanitisation(input, expected)
+    assert_converts_to(input, expected)
   end
 
   def test_markdown
     input = "Foo **bold** bar"
     expected = "<p>Foo <strong>bold</strong> bar</p>"
-    check_sanitisation(input, expected)
+    assert_converts_to(input, expected)
+  end
+
+  def test_markdown_paragraphs
+    input = "One\n\nTwo\nThree"
+    expected = "<p>One</p>\n\n<p>Two<br>\nThree</p>"
+    assert_converts_to(input, expected)
   end
 
   def test_markdown_code_with_ampersands
@@ -47,33 +41,17 @@ class ConvertsMarkdownToHTMLTest < Minitest::Test
 </pre></td>
 </tr></tbody></table>
 </div>}
-    check_sanitisation(input, expected)
+    assert_converts_to(input, expected)
   end
 
   def test_markdown_code_with_text_and_double_braces
     input = "```\nx{{current}}y\n```"
-    expected = %q{<div class="highlight plaintext">
-<table style="border-spacing: 0;"><tbody><tr>
-<td class="gutter gl" style="text-align: right;"><pre class="lineno">1</pre></td>
-<td class="code"><pre>x{{current}}y
-</pre></td>
-</tr></tbody></table>
-</div>}
-
-    check_sanitisation(input, expected)
+    Approvals.verify(ConvertsMarkdownToHTML.new(input).convert, name: 'markdown_text_and_double_braces')
   end
 
   def test_markdown_code_with_double_braces
     input = "```\n{{x: y}}\n```"
-    expected = %q{<div class="highlight json">
-<table style="border-spacing: 0;"><tbody><tr>
-<td class="gutter gl" style="text-align: right;"><pre class="lineno">1</pre></td>
-<td class="code"><pre><span class="p">{</span><span class="err">{x</span><span class="p">:</span><span class="w"> </span><span class="err">y</span><span class="p">}</span><span class="err">}</span><span class="w">
-</span></pre></td>
-</tr></tbody></table>
-</div>}
-
-    check_sanitisation(input, expected)
+    Approvals.verify(ConvertsMarkdownToHTML.new(input).convert, name: 'markdown_double_braces')
   end
 
   def test_markdown_code_with_javascript_and_double_braces
@@ -128,7 +106,7 @@ end
 
 <p>Post text</p>}
 
-    check_sanitisation(input, expected)
+    assert_converts_to(input, expected)
   end
 
   def test_markdown_with_clojure_code
@@ -152,24 +130,24 @@ end
 </span></pre></td>
 </tr></tbody></table>
 </div>}
-    check_sanitisation(input, expected)
+    assert_converts_to(input, expected)
   end
 
   def test_stubby_lambda
     input = "->"
     expected = "<p>-&gt;</p>"
-    check_sanitisation(input, expected)
+    assert_converts_to(input, expected)
   end
 
   def test_elixir_operator
     input = "->>"
     expected = "<p>-&gt;&gt;</p>"
-    check_sanitisation(input, expected)
+    assert_converts_to(input, expected)
   end
 
   def test_ascii_hearts
     input = "<3 This is lovely!"
     expected = "<p>&lt;3 This is lovely!</p>"
-    check_sanitisation(input, expected)
+    assert_converts_to(input, expected)
   end
 end

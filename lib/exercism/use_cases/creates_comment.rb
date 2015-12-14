@@ -21,9 +21,13 @@ class CreatesComment
   def create
     @comment = submission.comments.create(user: commenter, body: body)
     unless @comment.new_record?
-      submission.unmute_all!
-      submission.user_exercise.reopen! if submission.hibernating?
-      submission.mute(commenter)
+      exercise = submission.user_exercise
+      if exercise.present? # FIXME: only a problem in tests
+        submission.viewed_by(commenter)
+        exercise.update_last_activity(@comment)
+        exercise.save
+      end
+
       unless submission.user == commenter
         submission.nit_count += 1
       end

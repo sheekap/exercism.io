@@ -44,49 +44,20 @@ class SubmissionTest < Minitest::Test
     refute_nil submission.key
   end
 
-  def test_supersede_pending_submission
-    assert_equal 'pending', submission.state
-    submission.supersede!
-    submission.reload
-    assert_equal 'superseded', submission.state
-  end
-
-  def test_supersede_hibernating_submission
-    submission.state = 'hibernating'
-    submission.supersede!
-    submission.reload
-    assert_equal 'superseded', submission.state
-  end
-
-  def test_supersede_completed_submissions
-    submission.state = 'done'
-    submission.done_at = Time.now
-    submission.save
-    submission.supersede!
-    assert_equal 'superseded', submission.state
-    assert_nil   submission.done_at
-  end
-
   def test_like_sets_is_liked
-    submission = Submission.new(state: 'pending')
+    submission = Submission.new
     submission.like!(alice)
     assert submission.is_liked = true
   end
 
   def test_like_sets_liked_by
-    submission = Submission.create(state: 'pending', user: alice)
+    submission = Submission.create(user: alice)
     submission.like!(fred)
     assert_equal [fred], submission.liked_by
   end
 
-  def test_like_calls_mute
-    submission = Submission.create(state: 'pending', user: alice)
-    submission.expects(:mute).with(fred)
-    submission.like!(fred)
-  end
-
   def test_unlike_resets_is_liked_if_liked_by_is_empty
-    submission = Submission.create(state: 'pending', user: alice)
+    submission = Submission.create(user: alice)
     Like.create(submission: submission, user: fred)
     submission.unlike!(fred)
     refute submission.is_liked
@@ -94,7 +65,7 @@ class SubmissionTest < Minitest::Test
 
   def test_unlike_does_not_reset_is_liked_if_liked_by_is_not_empty
     bob = User.create(username: 'bob')
-    submission = Submission.create(state: 'pending', user: alice)
+    submission = Submission.create(user: alice)
     Like.create(submission: submission, user: bob)
     Like.create(submission: submission, user: fred)
     submission.unlike!(bob)
@@ -102,16 +73,10 @@ class SubmissionTest < Minitest::Test
   end
 
   def test_unlike_changes_liked_by
-    submission = Submission.create(state: 'pending', user: alice)
+    submission = Submission.create(user: alice)
     Like.create(submission: submission, user: fred)
     submission.unlike!(fred)
     assert_equal [], submission.liked_by
-  end
-
-  def test_unlike_calls_unmute
-    submission = Submission.create(state: 'pending', user: alice)
-    submission.expects(:unmute).with(fred)
-    submission.unlike!(fred)
   end
 
   def test_liked_reflects_positive_is_liked
@@ -124,60 +89,6 @@ class SubmissionTest < Minitest::Test
     refute submission.liked?
   end
 
-  def test_muted_by_when_muted
-    submission = Submission.create(user: fred, state: 'pending')
-    submission.mute! alice
-    assert submission.muted_by?(alice)
-  end
-
-  def test_unmuted_for_when_muted
-    submission.mute(submission.user)
-    submission.save
-    refute(Submission.unmuted_for(submission.user).include?(submission),
-           "unmuted_for should only return submissions that have not been muted")
-  end
-
-  def test_muted_by_when_not_muted
-    submission = Submission.new(state: 'pending')
-    refute submission.muted_by?(alice)
-  end
-
-  def test_submissions_with_no_views
-    assert_empty submission.viewers
-    assert_equal 0, submission.view_count
-  end
-
-  def test_viewed_submission
-    alice = User.create(username: 'alice')
-    bob = User.create(username: 'bob')
-    charlie = User.create(username: 'charlie')
-    submission.viewed!(alice)
-    submission.viewed!(bob)
-    submission.viewed!(charlie)
-    submission.viewed!(bob)
-    submission.reload
-
-    assert_equal %w(alice bob charlie), submission.viewers.map(&:username)
-    assert_equal 3, submission.view_count
-  end
-
-  def test_viewing_submission_twice_is_fine
-    alice = User.create(username: 'alice')
-    submission.viewed!(alice)
-    submission.viewed!(alice)
-    assert_equal 1, submission.view_count
-    assert_equal %w(alice), submission.viewers.map(&:username)
-  end
-
-  def test_viewing_with_increase_in_viewers
-    alice = User.create(username: 'alice')
-    bob = User.create(username: 'bob')
-    submission.viewed!(alice)
-    assert_equal 1, submission.view_count
-    submission.viewed!(bob)
-    assert_equal 2, submission.view_count
-  end
-
   def test_comments_are_sorted
     submission.comments << Comment.new(body: 'second', created_at: Time.now, user: submission.user)
     submission.comments << Comment.new(body: 'first', created_at: Time.now - 1000, user: submission.user)
@@ -186,24 +97,6 @@ class SubmissionTest < Minitest::Test
     one, two = submission.comments
     assert_equal 'first', one.body
     assert_equal 'second', two.body
-  end
-
-  def test_aging_submissions
-    # not old
-    Submission.create(user: alice, state: 'pending', created_at: 20.days.ago, nit_count: 1)
-    # no nits
-    Submission.create(user: alice, state: 'pending', created_at: 22.days.ago, nit_count: 0)
-    # not pending
-    Submission.create(user: alice, state: 'completed', created_at: 22.days.ago, nit_count: 1)
-    # Meets criteria: old, pending, and with nits
-    s4 = Submission.create(user: alice, state: 'pending', created_at: 22.days.ago, nit_count: 1)
-
-    # Guard clause.
-    # All the expected submissions got created
-    assert_equal 4, Submission.count
-
-    ids = Submission.aging.map(&:id)
-    assert_equal [s4.id], ids
   end
 
   def test_not_commented_on_by
@@ -220,51 +113,26 @@ class SubmissionTest < Minitest::Test
     assert_equal expected, Submission.not_commented_on_by(user).sort
   end
 
-  def test_participant_submissions
-    user = User.create!
-    user_submission = problem_submission_for(user)
+  def test_exercise_viewed_updates_single_record_per_user_and_exercise
+    alice = User.create!(username: 'alice')
+    bob = User.create!(username: 'bob')
+    submission = Submission.create!(user: alice, language: 'rust', slug: 'pong')
+    exercise = UserExercise.create!(user: alice, language: 'rust', slug: 'pong', submissions: [submission])
+    submission.reload
 
-    commenter = User.create!
-    commenter_submission = problem_submission_for(commenter)
-    submission.comments << Comment.new(body: 'test', user: commenter)
+    submission.viewed_by(alice)
+    assert_equal 1, View.count
 
-    expected = [user_submission, commenter_submission].sort
-    assert_equal expected, submission.participant_submissions(user).sort
-  end
+    v1 = View.first
+    assert_equal alice.id, v1.user_id
+    assert_equal exercise.id, v1.exercise_id
+    refute_equal nil, v1.last_viewed_at
 
-  def test_participant_submissions_finds_last
-    commenter = User.create!
-    problem_submission_for(commenter).tap do |submission|
-      submission.supersede!
-    end
-    submission = problem_submission_for(commenter)
+    yesterday = 1.day.ago
+    v2 = View.create(user_id: bob.id, exercise_id: exercise.id, last_viewed_at: yesterday)
 
-    submission.comments << Comment.new(body: 'test', user: commenter)
-
-    assert_equal [submission], submission.participant_submissions.sort
-  end
-
-  def test_likes_by_submission
-    s1 = Submission.create!(user: alice, language: 'ruby', slug: 'bob', state: 'completed', created_at: 22.days.ago, nit_count: 1)
-    like = Like.create!(submission: s1, user: fred)
-    submissions = Submission.likes_by_submission
-    assert_equal submissions.first.total_likes, 1
-  end
-
-  def test_comments_by_submission
-    s1 = Submission.create!(user: alice, language: 'ruby', slug: 'bob', state: 'completed', created_at: 22.days.ago, nit_count: 1)
-    Comment.create!(submission: s1, user: fred, body: 'The face of a child can say it all, especially the mouth part of the face.')
-    submissions = Submission.comments_by_submission
-    assert_equal submissions.first.total_comments, 1
-  end
-
-  def test_trending_only_returns_recent_activity
-    UserExercise.create(user: alice, language: 'ruby', slug: 'bob', iteration_count: 1, state: 'done', is_nitpicker: true)
-    s1 = Submission.create!(user: alice, language: 'ruby', slug: 'bob', state: 'completed', created_at: 22.days.ago, nit_count: 1)
-    Comment.create!(submission: s1, user: fred, body: ' hope that after I die, people will say of me: "That guy sure owed me a lot of money."')
-    Like.create!(submission: s1, user: fred)
-    Comment.create!(submission: s1, user: fred, body: 'If you ever drop your keys into a river of molten lava, let em go, because, man, theyre gone.', created_at: Time.now - 12.hours)
-    trending = Submission.trending(alice, 4.hours)
-    assert trending.first.total_activity, 2
+    submission.viewed_by(bob)
+    assert_equal 2, View.count
+    assert_in_delta 1, v2.last_viewed_at.to_i, Time.now.utc.to_i
   end
 end

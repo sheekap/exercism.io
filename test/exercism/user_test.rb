@@ -8,49 +8,9 @@ class UserTest < Minitest::Test
     assert_match %r{\A[a-z0-9]{32}\z}, user.key
   end
 
-  def test_user_is_nitpicker_on_completed_assignment
-    user = User.create
-    Submission.create(user: user, language: 'ruby', slug: 'one', state: 'done')
-    Hack::UpdatesUserExercise.new(user.id, 'ruby', 'one').update
-    one = Problem.new('ruby', 'one')
-    assert user.nitpicker_on?(one)
-  end
-
-  def test_user_is_not_nitpicker_on_current_assignment
-    user = User.create
-    Submission.create(user: user, language: 'ruby', slug: 'one', state: 'pending')
-    one = Problem.new('ruby', 'one')
-    refute user.nitpicker_on?(one)
-  end
-
   def test_user_not_a_guest
     user = User.new
     refute user.guest?
-  end
-
-  def test_user_is?
-    user = User.new(username: 'alice')
-    assert user.is?('alice')
-    refute user.is?('bob')
-  end
-
-  def test_user_without_submissions_is_new
-    user = User.new
-    assert user.new?
-  end
-
-  def test_user_with_submissions_isnt_new
-    user = User.new
-    def user.submissions; [:some]; end
-    refute user.new?
-  end
-
-  def test_locksmith_isnt_new
-    locksmith = User.new
-    def locksmith.locksmith?
-      true
-    end
-    refute locksmith.new?
   end
 
   def test_create_user_from_github
@@ -107,57 +67,6 @@ class UserTest < Minitest::Test
     assert_equal 42, u1.github_id
   end
 
-  def test_locksmith_is_nitpicker
-    locksmith = User.new
-    def locksmith.locksmith?
-      true
-    end
-    assert locksmith.nitpicker?
-  end
-
-  def test_user_with_completed_exercises_is_nitpicker
-    user = User.new
-    def user.completed; [:some]; end
-    assert user.nitpicker?
-  end
-
-  def test_user_no_ongoing_without_exercises
-    user = User.new
-    assert_equal [], user.ongoing
-  end
-
-  def test_user_ongoing_with_submissions
-    user = User.create
-    problem = Problem.new('ruby', 'one')
-
-    user.submissions << create_submission(problem, code: "s1", state: 'superseded')
-    user.submissions << create_submission(problem, code: "s2")
-    user.save
-    user.reload
-
-    assert_equal ["s2"], user.ongoing.map(&:code)
-  end
-
-  def test_user_ongoing_ordered_by_latest_updated
-    user = User.create
-    problem = Problem.new('ruby', 'one')
-
-    first = create_submission(problem, code: "s1", updated_at: Date.yesterday)
-    second = create_submission(problem, code: "s2", updated_at: Date.today)
-
-    user.submissions << second
-    user.submissions << first
-    user.save
-    user.reload
-
-    assert_equal second, user.ongoing.first
-    assert_equal first, user.ongoing.last
-  end
-
-  def test_user_is_not_locksmith_by_default
-    refute User.new.locksmith?
-  end
-
   def test_find_user_by_case_insensitive_username
     %w{alice bob}.each do |name| User.create(username: name) end
     assert_equal 'alice', User.find_by_username('ALICE').username
@@ -170,7 +79,8 @@ class UserTest < Minitest::Test
 
   def test_create_users_unless_present
     User.create(username: 'alice')
-    assert_equal ['alice', 'bob'], User.find_or_create_in_usernames(['alice', 'bob']).map(&:username).sort
+    User.create(username: 'bob')
+    assert_equal ['alice', 'bob', 'charlie'], User.find_or_create_in_usernames(['alice', 'BOB', 'charlie']).map(&:username).sort
   end
 
   def test_delete_team_memberships_with_user
@@ -193,6 +103,64 @@ class UserTest < Minitest::Test
     refute TeamMembership.exists?(team: other_team, user: bob, inviter: alice), 'Unconfirmed TeamMembership was deleted.'
   end
 
+  def test_increment_adds_to_table
+    fred = User.create(username: 'fred')
+    fred.increment_five_a_day
+    count = FiveADayCount.where(user_id: fred.id).first
+    assert_equal 1, count.total
+  end
+
+  def test_increment_updates_single_record_per_user
+    fred = User.create(username: 'fred')
+    5.times {fred.increment_five_a_day}
+
+    count = FiveADayCount.where(user_id: fred.id).first
+    assert_equal 5, count.total
+    assert_equal 1, FiveADayCount.count
+  end
+
+  def test_five_a_day_exercises_comments
+    fred = User.create(username: 'fred')
+    sarah = User.create(username: 'sarah')
+    jaclyn = User.create(username: 'jaclyn')
+    ACL.authorize(fred, Problem.new('ruby', 'bob'))
+    ACL.authorize(fred, Problem.new('ruby', 'leap'))
+
+    ex1 = UserExercise.create!(
+        user: sarah,
+        last_iteration_at: 5.days.ago,
+        archived: false,
+        iteration_count: 1,
+        language: 'ruby',
+        slug: 'bob',
+        submissions: [Submission.create!(user: sarah, language: 'ruby', slug: 'bob', created_at: 22.days.ago, version: 1)]
+    )
+    Comment.create!(submission: ex1.submissions.first, user: sarah, body: 'I like to comment')
+
+    UserExercise.create!(
+        user: jaclyn,
+        last_iteration_at: 5.days.ago,
+        archived: false,
+        iteration_count: 1,
+        language: 'ruby',
+        slug: 'bob',
+        submissions: [Submission.create!(user: jaclyn, language: 'ruby', slug: 'bob', created_at: 22.days.ago, version: 1)]
+    )
+
+    ex3 = UserExercise.create!(
+        user: jaclyn,
+        last_iteration_at: 3.days.ago,
+        archived: false,
+        iteration_count: 1,
+        language: 'ruby',
+        slug: 'leap',
+        submissions: [Submission.create!(user: jaclyn, language: 'ruby', slug: 'bob', created_at: 22.days.ago, version: 1)]
+    )
+    Comment.create!(submission: ex3.submissions.first, user: fred, body: 'nice')
+
+    assert_equal 2, fred.five_a_day_exercises.size
+  end
+
   private
 
   def create_submission(problem, attributes={})
@@ -200,6 +168,4 @@ class UserTest < Minitest::Test
     attributes.each { |key, value| submission[key] = value }
     submission
   end
-
 end
-

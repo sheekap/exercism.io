@@ -1,3 +1,4 @@
+$:.unshift File.expand_path("./..", __FILE__)
 $:.unshift File.expand_path("./../lib", __FILE__)
 
 require 'bundler'
@@ -10,7 +11,7 @@ if ENV['RACK_ENV'] != 'production'
 end
 
 require 'app'
-require 'api'
+require 'api/v1'
 
 ENV['RACK_ENV'] ||= 'development'
 
@@ -25,6 +26,7 @@ if ENV['RACK_ENV'].to_sym == :development
 end
 
 use ActiveRecord::ConnectionAdapters::ConnectionManagement
+use Rack::MethodOverride
 run ExercismWeb::App
 
 map '/api/v1/' do

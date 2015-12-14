@@ -1,3 +1,5 @@
+require 'json'
+require_relative '../app/presenters/tracks.rb'
 module ExercismWeb
   module Presenters
     class Tracks

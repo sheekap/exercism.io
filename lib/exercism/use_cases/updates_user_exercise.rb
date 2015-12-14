@@ -12,14 +12,14 @@ module Hack
       return unless latest
 
       exercise.user_id = user_id
-      exercise.state = latest.state
       exercise.language = latest.language
       exercise.slug = latest.slug
       exercise.created_at ||= earliest_submission_at
       exercise.updated_at = most_recent_change_at
-      exercise.completed_at = exercise.updated_at if done?
-      exercise.is_nitpicker = true
       exercise.iteration_count = submissions.count
+      exercise.skipped_at = nil if exercise.iteration_count > 0
+      exercise.last_iteration_at = latest.created_at
+      exercise.update_last_activity(latest)
       exercise.save
 
       submissions.each do |s|
@@ -40,10 +40,6 @@ module Hack
 
     def most_recent_change_at
       latest.updated_at
-    end
-
-    def done?
-      latest.state == 'done'
     end
 
     def options

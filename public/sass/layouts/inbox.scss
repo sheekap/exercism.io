@@ -1,0 +1,67 @@
+// Dear people who know CSS and Sass,
+// I'm sorry!
+// - Katrina
+@import '../base/themes/exercism';
+
+main#track-exercises {
+  .mark-all .btn-link {
+    float: right;
+    margin-top: 30px;
+  }
+  .btn-link.discrete {
+    color: #ccc;
+    font-size: 0.9em;
+  }
+
+  ul.active-exercises {
+    list-style-type: none;
+    padding: 0;
+
+    li.unread a {
+      font-weight: bold;
+      h4 {
+        font-weight: bold;
+      }
+    }
+
+    li {
+      position: relative;
+      padding: 10px 0;
+      clear: both;
+
+      a.exercise {
+        position: relative;
+        display: block;
+        padding: 10px;
+        color: #333;
+
+        h4 {
+          padding: 0;
+          margin: -10px 0 0 0;
+          span.profile {
+            font-size: 0.8em;
+            font-style: italic;
+            font-family: $font-family-sans-serif;
+          }
+        }
+
+        p {
+          padding: 0;
+          margin: 0;
+          color: #777;
+        }
+      }
+
+      .avatar {
+        float: left;
+        width: 60px;
+        height: 60px;
+        margin-right: 10px;
+      }
+
+      .inbox-text {
+        padding: 10px 0 0 0;
+      }
+    }
+  }
+}

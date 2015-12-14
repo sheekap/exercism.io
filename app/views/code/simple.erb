@@ -1,0 +1,17 @@
+<div <%= "id='#{html[:id]}'" if html[:id] %>
+  <%= "style='#{html[:style]}'" if html[:style] %>
+  class="code col-md-6">
+  <h2><%= title %></h2>
+  <div class"btn-group">
+    <a class="btn btn-default" data-action="enlarge">
+      <i class="fa fa-expand"></i>
+    </a>
+    <a style="display: none;" class="btn btn-default" data-action="shrink">
+      <i class="fa fa-compress"></i>
+    </a>
+    <br />
+  </div>
+  <div style="padding-top: 2px;">
+    <%= syntax(code, language) %>
+  </div>
+</div>

@@ -1,0 +1,17 @@
+<div class="container">
+  <section class="page-header">
+    <h1>Edit Nitpick</h1>
+  </section>
+  <section>
+    <form class="inline" action="/submissions/<%= submission.key %>/nits/<%= nit.id %>" method='POST'>
+      <%= erb :"submissions/comment", locals: {nit: nit, submission: submission} %>
+      <p>Parsed with <a href="https://help.github.com/articles/github-flavored-markdown" target="_blank">GitHub Flavoured Markdown</a></p>
+      <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+
+    <form class="inline" action="/submissions/<%= submission.key %>/nits/<%= nit.id %>" method='POST'>
+      <input type="hidden" name="_method" value="delete">
+        <button type="submit" class="btn btn-danger" name="delete">Delete</button>
+    </form>
+  </section>
+</div>

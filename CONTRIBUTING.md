@@ -4,6 +4,7 @@ First of all, **thank you** for helping with Exercism.io!
 
 We are working to improve this document, and if you find any part of it confusing, or if you can't figure out how to get started with something, then rest assured it's not you, it's us! Please open up a new issue to describe what you were hoping to contribute with, and what you're wondering about, and we'll figure out together how to improve the documentation.
 
+* [Code of Conduct](#code-of-conduct)
 * [The Ecosystem](#the-ecosystem)
 * [Get Set Up](#setup)
     - [Console](#console)
@@ -25,48 +26,42 @@ Help us keep exercism welcoming. Please read and abide by the [Code of
 
 ## The Ecosystem
 
-Exercism actually consists of several different parts, many of which are in
-separate repositories. Most people will be familiar with **the website** where
-they have conversations with people about the various exercises, as well as
-**the command-line client**, which is used to fetch problems and submit
-solutions.
+Exercism consists of two main parts:
 
-In addition to these, there is the **problems API**, which is what the
-command-line client talks to when fetching problems.
+- **the website** - where the conversations happen (this repository)
+- **the command-line interface (CLI)** - to fetch exercises and submit solutions [exercism/cli](https://github.com/exercism/cli)
 
-For example, if you say `exercism fetch go clock`, then the CLI makes a call
-to http://x.exercism.io/tracks/go/clock, and then uses that data to create
-the files on the user's computer.
+Behind the scenes we also have:
 
-* website: https://github.com/exercism/exercism.io (Ruby using Sinatra, JavaScript using Angular)
-* problems API: https://github.com/exercism/x-api (Ruby using Sinatra)
-* command-line client: https://github.com/exercism/cli (Go)
+- **language tracks** - one repository per language [see list](https://github.com/exercism/x-api/tree/master/tracks)
+- **problem metadata** - a shared repository for all languages [exercism/x-common](https://github.com/exercism/x-common)
+- **the problems API** - serves the exercise data [exercism/x-api](https://github.com/exercism/x-api)
+- **rikki- the robot** - provides automated feedback on certain exercises [exercism/rikki](https://github.com/exercism/rikki)
 
-### Languages and Practice Problems
+### Contributing
 
-The problems (test suites) for each language are in separate repositories.
-This is useful since different people contribute to different languages, and
-it allows us to have people manage pull requests and contributions to a
-specific language without being overwhelmed by irrelevant issues and tickets.
+We curate issues that we think are good for starting out into [exercism/todo](https://github.com/exercism/todo/labels/start-here).
 
-If you'd like to
+If you want to work on the exercism.io website codebase, then continue reading this guide.
 
-* fix inconsistencies in READMEs or test suites
-* improve existing problems in existing language tracks
-* contribute new problems in existing language tracks
-* contribute problems in a new language track
+To contribute to one of the language tracks, check out the [Language Track Guide](https://github.com/exercism/x-common/blob/master/CONTRIBUTING.md).
 
-then please see the [Problem API's CONTRIBUTING
-guide](https://github.com/exercism/x-api/blob/master/CONTRIBUTING.md).
+For details about working with the problems API, check out the [Problems API Guide](https://github.com/exercism/x-api/blob/master/CONTRIBUTING.md).
 
 ## Setup
 
-If you'd like to do work on the exercism.io app, then you'll need to have it
-running locally.
+This section walks you through getting the exercism.io app running locally.
 
 ### Prerequisites
 
-For working on the backend you'll need both Ruby and PostgreSQL. Frontend development uses Node.js.
+Backend:
+
+- Ruby
+- PostgreSQL
+
+Frontend:
+
+- Node.js
 
 To install Ruby, check out [RVM](https://rvm.io), [rbenv](https://github.com/sstephenson/rbenv) or [ruby-install](https://github.com/postmodern/ruby-install).
 
@@ -78,12 +73,12 @@ On other systems see the [Node.js docs](https://github.com/joyent/node/wiki/Inst
 
 ### GitHub OAuth
 
-In order to be able to log into your local version of the application, you will
-need to create some keys on GitHub that the app can talk to.
+To log into the app locally, you will need keys on GitHub
+that the app can talk to.
 
 Go to https://github.com/settings/applications/new and enter the following:
 
-* Application name: You can name it whatever you want. I have _Exercism (Dev)_.
+* Application name: You can name it whatever you want, e.g. _Exercism (Dev)_.
 * Homepage URL: http://localhost:4567
 * Authorization callback URL: http://localhost:4567/github/callback
 
@@ -91,7 +86,8 @@ Click _Register application_, and you'll see something like this:
 
 ![](/docs/oauth-client-secret.png)
 
-Later you will add the **Client ID** and **Client Secret** to a configuration file.
+Hang on to those. You'll need to add the **Client ID** and **Client Secret** to a
+configuration file in just a moment.
 
 ### The Code
 
@@ -104,38 +100,48 @@ First, you need to get ahold of the code, so you have a copy of it locally that 
 
 ### Configuration
 
-* If you use a Ruby version manager such as RVM, rbenv or chruby, then: `cp .ruby-version.example .ruby-version`
-* Copy the environment config: `cp config/env .env`
+In most cases, it is easiest to run the `bin/setup` script to automatically setup the defaults for the application.
+
+The script will:
+
+* setup the `.ruby-version` file for your Ruby version manager such as RVM, rbenv or chruby
+* copy the environment config to `.env`
+* run bundler to install the required gems
+* create the development database using the credentials in `config/database.yml`
+* download and seed the database with a good starting set of data
+* create the test database
+* run the test suite
+
+Then you'll need to:
+
 * Open `.env` and add the **Client ID** and **Client Secret** from the previous GitHub OAuth steps.
 
 All the commented out values in `.env` can be left alone for now.
 
 You don't need to fill in the EXERCISES_API value unless you're going to be working on the x-api codebase.
 
-### Dependencies
-
-Next, make sure all the application dependencies are installed:
-
-* Install gems with: `bundle install`
-
 ### Data
 
-Finally, set up the database. This means both creating the underlying database, and migrating so that it
-has all the correct tables. Also runs a script to add fake data, so there are things to click on and look at while working on the app.
+If you ran `bin/setup` you should be all set.
 
-First of all, copy the database config file:
+You can easily reset an existing database to its original state and add the fake data in one step:
 
-* `cp config/database.example.yml config/database.yml`
+* `rake db:reseed`
 
-Update any settings (like the port your database runs on) as needed. You can now set up the database for development:
+If you need to set PostgreSQL parameters like the user and/or database name to use during setup, set `PGUSER` and/or `PGDATABASE` environment values respectively. Example: `PGUSER=pgsql PGDATABASE=postgres rake db:reseed`
 
-* Do all of it in one go: `rake db:from_scratch`
+#### Troubleshooting
 
-Please note that this will call `psql`, and `createdb`. If you need to set PostgreSQL parameters like the user and/or database name to use during setup, set `PGUSER` and/or `PGDATABASE` environment values respectively. Example: `PGUSER=pgsql PGDATABASE=postgres rake db:from_scratch`
-
-Alternatively (or to debug if the above blows up), do it one-by-one:
+To debug the database setup, do it step-by-step:
 
 * Create the PostgreSQL database: `rake db:setup`
+* Run the database migrations: `rake db:migrate`
+* Fetch the seed data: `rake db:seeds:fetch`
+* Seed the database: `rake db:seed`
+
+If you are having 'PG::Connection ...' or 'Peer authentication failed for user ...' issues you can follow these steps (this is assuming that you modified the database.yml file and your changes are not being accessed properly. Anywhere that it is stated "PGUSER=postgres" replace "postgres" with your specified username that you use for your postgresql databases):
+
+* Create the PostgreSQL database (this will prompt you to input a password allowing you to authenticate and create your databases that are specified in your database.yml file): `PGUSER=postgres rake db:create`
 * Run the database migrations: `rake db:migrate`
 * Fetch the seed data: `rake db:seeds:fetch`
 * Seed the database: `rake db:seed`
@@ -148,12 +154,27 @@ as fake comments. In development mode there is an "Assume" menu item to the far 
 nav bar. This will let you easily assume different fake identities to see the site
 from their perspective.
 
+You may need to edit the `config/database.yml` file to specify non-default values. If you do, please edit (or create) a `.git/info/exclude` file so that your changes don't get committed. Unfortunately we have to commit the database.yml file, because heroku no longer creates a default one.
+
 ### Run The Application
 
 * Start the server with: `foreman s -p 4567`
 * Sometimes you need to: `bundle exec foreman s -p 4567`
 * Then you can access the local server at [localhost:4567](http://localhost:4567).
 * You can log in as a test user using the `assume` dropdown menu on the top right of the page without creating any new user for the app.
+
+### Running The Application In A Vagrant Environment
+_The following assumes your Vagrantfile is configured to forward port 3000 to 3030, adjust the port number to suit your environment_
+
+If you are using a different port than 3000 to forward outside of your Vagrant environment you will need to go into `Procfile_Vagrant` and adjust the port number that applies to your needs.
+
+* Copy the Vagrant Procfile example `cp Procfile_Vagrant.example Procfile_Vagrant`
+* Start the server with: `foreman s -f Procfile_Vagrant` (the `-f` explicitly states which Procfile to use and we don't want to use the original Procfile in our vagrant environments)
+* Sometimes you need to: `bundle exec foreman s -f Procfile_Vagrant`
+* Then you can access the local server at [localhost:3030](http://localhost:3030).
+* You can log in as a test user using the `assume` dropdown menu on the top right of the page without creating any new user for the app.
+
+_Again this is assuming you are forwarding port 3000 to 3030 in your Vagrantfile, adjust accordingly to your environment_
 
 ### Console
 

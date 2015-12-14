@@ -4,9 +4,9 @@ class User < ActiveRecord::Base
   serialize :mastery, Array
 
   has_many :submissions
-  has_many :alerts
   has_many :notifications
   has_many :comments
+  has_many :five_a_day_counts
   has_many :exercises, class_name: "UserExercise"
   has_many :lifecycle_events, ->{ order 'created_at ASC' }, class_name: "LifecycleEvent"
 
@@ -26,6 +26,10 @@ class User < ActiveRecord::Base
   def reset_key
     self.key = Exercism.uuid
     save
+  end
+
+  def can_access?(problem)
+    ACL.where(user_id: id, language: problem.track_id, slug: problem.slug).count > 0
   end
 
   def self.from_github(id, username, email, avatar_url)
@@ -56,8 +60,10 @@ class User < ActiveRecord::Base
   end
 
   def self.find_or_create_in_usernames(usernames)
-    recruits = usernames - find_in_usernames(usernames).map(&:username)
-    User.create recruits.reduce([]) { |acc, curr| acc.push username: curr } unless recruits.empty?
+    members = find_in_usernames(usernames).map(&:username).map(&:downcase)
+    usernames.reject {|username| members.include?(username.downcase)}.each do |username|
+      User.create(username: username)
+    end
     find_in_usernames(usernames)
   end
 
@@ -69,12 +75,16 @@ class User < ActiveRecord::Base
     find_by(username: username)
   end
 
+  def sees_exercises?
+    ACL.where(user_id: id).count > 0
+  end
+
   def onboarding_steps
     @onboarding_steps ||= lifecycle_events.map(&:key)
   end
 
-  def ongoing
-    @ongoing ||= active_submissions.order('updated_at DESC')
+  def fetched?
+    onboarding_steps.include?("fetched")
   end
 
   def onboarded?
@@ -85,84 +95,56 @@ class User < ActiveRecord::Base
     submissions.order('id DESC').where(language: problem.track_id, slug: problem.slug)
   end
 
-  def most_recent_submission
-    submissions.order("created_at ASC").last
-  end
-
   def guest?
     false
   end
 
-  def working_on?(problem)
-    SubmissionStatus.is_user_working_on?(self, problem)
-  end
-
-  def nitpicks_trail?(track_id)
-    nitpicker_languages.include?(track_id)
-  end
-
-  def nitpicker_languages
-    unlocked_languages | mastery
-  end
-
-  def completed
-    @completed ||= items_where "submissions", "state='done'"
-  end
-
   def nitpicker
-    @nitpicker ||= items_where "user_exercises", "is_nitpicker='t'"
-  end
-
-  def is?(handle)
-    username == handle
-  end
-
-  def nitpicker_on?(problem)
-    mastery.include?(problem.track_id) || unlocked?(problem)
-  end
-
-  def unlocked?(problem)
-    exercises.where(language: problem.track_id, slug: problem.slug, is_nitpicker: true).count > 0
-  end
-
-  def completed?(problem)
-    SubmissionStatus.is_user_done_with?(self, problem)
-  end
-
-  def locksmith?
-    !mastery.empty?
-  end
-
-  def nitpicker?
-    locksmith? || completed.size > 0
-  end
-
-  def new?
-    !locksmith? && submissions.count == 0
+    @nitpicker ||= items_where "user_exercises", "iteration_count > 0"
   end
 
   def owns?(submission)
     self == submission.user
   end
 
-  def latest_submission
-    @latest_submission ||= submissions.pending.order(created_at: :desc).first
+  def increment_five_a_day
+    if five_a_day_counts.where(day: Date.today).exists?
+      five_a_day_counts.where(day: Date.today).first.increment!(:total)
+    else
+      FiveADayCount.create(user_id: self.id, total: 1, day: Date.today)
+    end
   end
 
-  def latest_submission_on(problem)
-    submissions_on(problem).first
+  def count_existing_five_a_day_sql
+    <<-SQL
+      SELECT total
+      FROM five_a_day_counts
+      WHERE user_id=#{id}
+      AND day='#{Date.today}'
+    SQL
   end
 
-  def active_submissions
-    submissions.pending
+  def count_existing_five_a_day
+    [
+      ActiveRecord::Base.connection.execute(count_existing_five_a_day_sql).field_values("total").first.to_i,
+      5
+    ].min
   end
 
-  def unlocked_languages
-    @unlocked_languages ||= exercises.where(is_nitpicker: true).pluck('language').uniq
+  def five_a_day_exercises
+    @exercises_list ||= ActiveRecord::Base.connection.execute(five_a_day_exercises_sql).to_a
   end
 
-  def completed_submissions_in(track_id)
-    submissions.done.where(language: track_id)
+  def show_five_suggestions?
+    onboarded? && five_available?
+  end
+
+  def five_available?
+    (five_a_day_exercises.count + count_existing_five_a_day) == 5
+  end
+
+  def default_language
+    ACL.select('DISTINCT language').where(user_id: id).order(:language).map(&:language).first
   end
 
   private
@@ -172,5 +154,41 @@ class User < ActiveRecord::Base
     User.connection.execute(sql).to_a.each_with_object(Hash.new {|h, k| h[k] = []}) do |result, problems|
       problems[result["track_id"]] << result["slug"]
     end
+  end
+
+  def five_a_day_exercises_sql
+    <<-SQL
+      SELECT
+        e.language,
+        e.slug,
+        e.key,
+        u.username AS username,
+        COALESCE(c.comment_count, 0)
+        FROM acls a
+        INNER JOIN user_exercises e
+          ON a.language=e.language
+          AND a.slug=e.slug
+        INNER JOIN users u
+          ON u.id = e.user_id
+        LEFT JOIN (
+          SELECT
+            COUNT(c.id) AS comment_count,
+            s.user_exercise_id AS exercise_id,
+            EVERY(c.user_id<>#{id}) AS no_comment
+          FROM comments c
+          INNER JOIN submissions s
+          ON s.id=c.submission_id
+          GROUP BY s.user_exercise_id
+        ) as c
+        ON c.exercise_id=e.id
+        WHERE e.user_id<>#{id}
+          AND a.user_id=#{id}
+          AND e.archived='f'
+          AND e.slug<>'hello-world'
+          AND (c.no_comment='t' OR c.no_comment IS NULL)
+          AND e.last_iteration_at > (NOW()-INTERVAL '30 days')
+      ORDER BY COALESCE(c.comment_count, 0) ASC, e.iteration_count DESC
+      LIMIT (5-#{count_existing_five_a_day});
+    SQL
   end
 end

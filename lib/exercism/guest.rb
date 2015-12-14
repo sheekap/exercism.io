@@ -2,6 +2,10 @@ class Guest
   def id
   end
 
+  def fetched?
+    false
+  end
+
   def onboarded?
     false
   end
@@ -10,43 +14,19 @@ class Guest
     []
   end
 
-  def nitpicks_trail?(_)
-    false
-  end
-
-  def nitpicker_languages
-    []
-  end
-
-  def ongoing
-    []
-  end
-
-  def current
-    {}
+  def exercises
+    UserExercise.where('1=2')
   end
 
   def guest?
     true
   end
 
-  def locksmith?
-    false
-  end
-
-  def is?(_)
-    false
-  end
-
-  def new?
-    false
-  end
-
-  def nitpicker?
-    false
-  end
-
   def owns?(_)
+    false
+  end
+
+  def show_five_suggestions?
     false
   end
 end

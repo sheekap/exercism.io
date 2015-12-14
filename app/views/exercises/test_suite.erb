@@ -1,0 +1,9 @@
+<div class="container">
+  <%= erb :"exercises/_navigation", locals: {exercise: exercise, active: 'tests' } %>
+  <% exercise.files.each do |filename, content| %>
+    <div>
+      <h4><%= filename %></h4>
+      <%= syntax(content, exercise.track_id) %>
+    </div>
+  <% end %>
+</div>

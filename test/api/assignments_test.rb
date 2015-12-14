@@ -24,7 +24,7 @@ class AssignmentsApiTest < Minitest::Test
   def test_api_accepts_submission_attempt
     Notify.stub(:everyone, nil) do
       Xapi.stub(:exists?, true) do
-        post '/user/assignments', {key: alice.key, code: 'THE CODE', path: 'ruby/one/code.rb'}.to_json
+        post '/user/assignments', {key: alice.key, solution: {'ruby/one/code.rb' => 'THE CODE'}}.to_json
       end
     end
 
@@ -60,7 +60,7 @@ class AssignmentsApiTest < Minitest::Test
   def test_provides_a_useful_error_message_when_key_is_wrong
     Notify.stub(:everyone, nil) do
       Xapi.stub(:exists?, true) do
-        post '/user/assignments', {key: 'no-such-key', code: 'THE CODE', path: 'ruby/one/code.rb'}.to_json
+        post '/user/assignments', {key: 'no-such-key', solution: {'ruby/one/code.rb' => 'THE CODE'}}.to_json
       end
     end
     assert_equal 401, last_response.status
@@ -69,12 +69,12 @@ class AssignmentsApiTest < Minitest::Test
   def test_api_accepts_submission_on_completed_exercise
     Notify.stub(:everyone, nil) do
       Xapi.stub(:exists?, true) do
-        post '/user/assignments', {key: alice.key, code: 'THE CODE', path: 'go/one/code.go'}.to_json
+        post '/user/assignments', {key: alice.key, solution: {'ruby/one/code.rb' => 'THE CODE'}}.to_json
       end
     end
 
     submission = Submission.first
-    problem = Problem.new('go', 'one')
+    problem = Problem.new('ruby', 'one')
     assert_equal problem, submission.problem
     assert_equal 201, last_response.status
 
@@ -88,12 +88,12 @@ class AssignmentsApiTest < Minitest::Test
     dave = User.create username: 'dave', github_id: -4
     eve = User.create username: 'eve', github_id: -5
 
-    Submission.create(language: 'ruby', slug: 'bob', code: 'CODE', user: charlie)
-    Submission.create(language: 'ruby', slug: 'bob', code: 'CODE', user: dave, state: 'done')
+    Submission.create({language: 'ruby', slug: 'one', user: charlie, solution: {'ruby/one/code.rb' => 'THE CODE'}})
+    Submission.create({language: 'ruby', slug: 'one', user: dave, solution: {'ruby/one/code.rb' => 'THE CODE'}})
 
-    team1 = Team.by(alice).defined_with(slug: 'team1', usernames: [bob, charlie])
+    team1 = Team.by(alice).defined_with(slug: 'team1', usernames: "bob, charlie")
     team1.save
-    team2 = Team.by(alice).defined_with(slug: 'team2', usernames: [bob, dave, eve])
+    team2 = Team.by(alice).defined_with(slug: 'team2', usernames: "bob, dave, eve")
     team2.save
 
     team1.confirm(bob.username)
@@ -102,7 +102,7 @@ class AssignmentsApiTest < Minitest::Test
     team2.confirm(eve.username)
 
     Xapi.stub(:exists?, true) do
-      post '/user/assignments', {key: bob.key, code: 'THE CODE', path: 'ruby/bob/code.rb'}.to_json
+      post '/user/assignments', {key: bob.key, solution: {'ruby/one/code.rb' => 'THE CODE'}}.to_json
     end
     assert_equal 201, last_response.status
 
@@ -116,10 +116,10 @@ class AssignmentsApiTest < Minitest::Test
   end
 
   def test_api_rejects_duplicates
-    Attempt.new(alice, 'THE CODE', 'ruby/one/code.rb').save
+    Attempt.new(alice, Iteration.new('ruby/one/code.rb' => 'THE CODE')).save
     Notify.stub(:everyone, nil) do
       Xapi.stub(:exists?, true) do
-        post '/user/assignments', {key: alice.key, code: 'THE CODE', path: 'ruby/one/code.rb'}.to_json
+        post '/user/assignments', {key: alice.key, solution: {'ruby/one/code.rb' => 'THE CODE'}}.to_json
       end
     end
 
@@ -127,65 +127,5 @@ class AssignmentsApiTest < Minitest::Test
 
     assert_equal 400, last_response.status
     assert_equal "duplicate of previous iteration", response_error
-  end
-
-  def test_unsubmit_success
-    unsubmit_object = stub()
-
-    Unsubmit.expects(:new).with(alice).returns(unsubmit_object)
-    unsubmit_object.expects(:unsubmit)
-
-    delete '/user/assignments', {key: alice.key}
-    assert_equal 204, last_response.status
-  end
-
-  def test_unsubmit_fails_no_submission
-    unsubmit_object = stub()
-
-    Unsubmit.expects(:new).with(alice).returns(unsubmit_object)
-    unsubmit_object.expects(:unsubmit).raises(Unsubmit::NothingToUnsubmit.new)
-
-    delete '/user/assignments', {key: alice.key}
-    assert_equal 404, last_response.status
-  end
-
-  def test_unsubmit_fails_with_nits
-    unsubmit_object = stub()
-
-    Unsubmit.expects(:new).with(alice).returns(unsubmit_object)
-    unsubmit_object.expects(:unsubmit).raises(Unsubmit::SubmissionHasNits.new)
-
-    delete '/user/assignments', {key: alice.key}
-    assert_equal 403, last_response.status
-  end
-
-  def test_unsubmit_fails_when_already_done
-    unsubmit_object = stub()
-
-    Unsubmit.expects(:new).with(alice).returns(unsubmit_object)
-    unsubmit_object.expects(:unsubmit).raises(Unsubmit::SubmissionDone.new)
-
-    delete '/user/assignments', {key: alice.key}
-    assert_equal 403, last_response.status
-  end
-
-  def test_unsubmit_fails_too_old
-    unsubmit_object = stub()
-
-    Unsubmit.expects(:new).with(alice).returns(unsubmit_object)
-    unsubmit_object.expects(:unsubmit).raises(Unsubmit::SubmissionTooOld.new)
-
-    delete '/user/assignments', {key: alice.key}
-    assert_equal 403, last_response.status
-  end
-
-  def test_unsubmit_sets_previous_submission_to_pending_if_exists
-    Submission.create(user: @alice, code: 'CODE', state: 'superseded', language: 'ruby', slug: 'one', version: 1)
-    Submission.create(user: @alice, code: 'CODE', state: 'pending', language: 'ruby', slug: 'one', version: 2)
-
-    delete '/user/assignments', { key: @alice.key }
-
-    assert_equal 204, last_response.status
-    assert_equal 'pending', Submission.where({ version: 1 }).first.state
   end
 end

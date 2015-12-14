@@ -44,13 +44,13 @@ $(function() {
   $('textarea').each(function () {
     var $this = $(this);
     var question_text = "You have unsaved changes on this page";
-    var was_sumbitted = false;
-    $this.parents("form").on('submit',function(){
-      was_sumbitted = true;
+    var was_submitted = false;
+    $this.parents("form").on('submit',function(e){
+      was_submitted = true;
     });
     window.onbeforeunload = function (e) {
       var unsaved = $this.text() !== $this.val();
-      if(!was_sumbitted && unsaved) {
+      if(!was_submitted && unsaved) {
         // see http://stackoverflow.com/questions/10311341/confirmation-before-closing-of-tab-browser
         e = e || window.event;
 
@@ -61,6 +61,10 @@ $(function() {
         return question_text;
       }
     };
+  });
+  // Remove the window.onberofereload when deleting comments
+  $("button[type='submit'][name='delete']").on('click', function(e){
+    window.onbeforeunload = null;
   });
 
   // cmd + return submits nitpicks on mac ctrl + return submits on windows

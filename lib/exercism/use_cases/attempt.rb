@@ -2,68 +2,38 @@ require 'exercism/xapi'
 
 class Attempt
 
-  attr_reader :user, :code, :track, :slug, :filename, :iteration
+  attr_reader :user, :track, :slug, :iteration, :submission
   def initialize(user, *stuff)
     @user = user
-    if stuff.last.is_a?(Iteration)
-      @iteration = stuff.last
-    else
-      # TODO:
-      # 1. Change tests to use new iteration style
-      # 2. get rid of *stuff
-      # 3. get rid of code, filename attrs (don't write it on submission)
-      code, path = stuff
-      @iteration = Iteration.new({path => code})
-    end
+    @iteration = stuff.last
     @slug = iteration.slug
     @track = iteration.track_id
-
-    # hack
-    @code = iteration.solution.values.first
-    @filename = iteration.solution.keys.first
+    @submission = Submission.on(Problem.new(track, slug))
+    submission.solution = iteration.solution
   end
 
   def valid?
     !!slug && Xapi.exists?(track, slug)
   end
 
-  def submission
-    @submission ||= Submission.on(problem)
-  end
-
-  def problem
-    Problem.new(track, slug)
-  end
-
   def save
-    user.submissions_on(problem).each do |sub|
-      sub.supersede!
-      sub.unmute_all!
-    end
-    remove_from_completed(problem)
-    submission.solution = iteration.solution
-    submission.code = code
-    submission.filename = filename
     user.submissions << submission
     user.save
     Hack::UpdatesUserExercise.new(submission.user_id, submission.track_id, submission.slug).update
+    submission.reload.viewed_by(user)
     self
   end
 
-  def remove_from_completed(problem)
-    (user.completed[problem.track_id] || []).delete(problem.slug)
-  end
-
   def duplicate?
-    !code.empty? && previous_submission.code == code
+    !submission.solution.empty? && previous_submission.solution == submission.solution
   end
 
   def previous_submissions
-    @previous_submissions ||= user.submissions_on(problem).reject {|s| s == submission}
+    @previous_submissions ||= user.submissions_on(submission.problem).reject {|s| s == submission}
   end
 
   def previous_submission
-    @previous_submission ||= previous_submissions.first || NullSubmission.new(problem)
+    @previous_submission ||= previous_submissions.first || NullSubmission.new(submission.problem)
   end
 
   class InvalidAttemptError < StandardError; end

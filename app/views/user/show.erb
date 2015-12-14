@@ -1,0 +1,36 @@
+<div class="container">
+  <section class="page-header">
+    <h1><%= profile.username %></h1>
+  </section>
+
+  <div class="row">
+    <div class="col-md-12">
+      <p>
+        GitHub Profile:
+        <a target="_blank" href="https://github.com/<%= profile.username %>">
+          <%= profile.username %>
+        </a>
+      </p>
+
+      <h3>Exercises</h3>
+      <% if profile.has_current_exercises? %>
+        <%= erb :"user/_exercises_table", locals: { profile: profile, exercises: profile.exercises } %>
+      <% else %>
+        <p>No current exercises.</p>
+      <% end %>
+
+      <h4>Archived</h4>
+      <% if profile.has_archived_exercises? %>
+        <%= erb :"user/_archived_exercises_table", locals: { profile: profile } %>
+      <% else %>
+        <p>No archived exercises.</p>
+      <% end %>
+
+      <hr>
+
+      <p><i class="fa fa-lock"></i> Exercises that you do not yet have access to are marked with a lock. These will show the README/test suite for the exercise.</p>
+      <p>You can gain access to a problem by fetching it (e.g. <code>exercism fetch python etl</code>) and submitting a solution.</p>
+
+    </div>
+  </div>
+</div>

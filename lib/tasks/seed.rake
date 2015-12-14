@@ -17,6 +17,9 @@ namespace :db do
     end
   end
 
+  desc "reset db and reseed data"
+  task :reseed => ["db:drop", "db:create", "db:migrate", "db:seed"]
+
   desc "generate seed data"
   task :seed do
     require 'bundler'
@@ -36,29 +39,6 @@ namespace :db do
     Submission.all.each do |s|
       s.nit_count = s.comments.size
       s.save
-    end
-  end
-
-  desc "add recently viewed data for a specific (test) user by username"
-  task "seed:looks", [:username, :count] do |_, args|
-    if args[:username].nil?
-      puts "USAGE: rake db:seed:looks[username]\n   OR: rake db:seed:looks[username,count]"
-      exit 1
-    end
-
-    require 'bundler'
-    Bundler.require
-    require 'exercism'
-
-    count = args[:count] || 25
-    user = User.find_by_username(args[:username])
-    if user.nil?
-      puts "Unable to find user with username '#{args[:username]}'"
-      exit 1
-    end
-
-    UserExercise.order('created_at DESC').limit(count).pluck(:id).each do |id|
-      Look.check!(id, user.id)
     end
   end
 end

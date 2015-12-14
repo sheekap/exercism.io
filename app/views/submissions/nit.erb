@@ -1,0 +1,49 @@
+<div class="comment <%= "comment-submitter" if nit.nitpicker == submission.user %>">
+  <div class="comment-author">
+    <a href="/<%= nit.nitpicker.username %>">
+      <img src="<%= nit.nitpicker.avatar_url %>" class="img-responsive img-rounded" />
+    </a>
+  </div>
+  <div class="comment-body">
+    <%= nit.html_body %>
+    <div class="comment-meta">
+      <% if current_user == nit.nitpicker %>
+        <a href="/submissions/<%= submission.key %>/nits/<%= nit.id %>/edit" class="pull-right btn btn-default btn-xs edit-text">
+          <i class="fa fa-pencil"></i> Edit
+        </a>
+
+      <% elsif submission.user != nit.nitpicker %>
+        <% unless own_uuid.empty? %>
+          <a
+            href="/exercises/<%= own_uuid %>"
+            class="pull-right btn btn-default btn-xs"
+            data-toggle="tooltip"
+            data-placement="bottom"
+            title="<%= nit.nitpicker.username %>'s solution to this exercise"
+            target="_blank">
+            <i class="fa fa-rocket"></i>
+          </a>
+        <% end %>
+      <% end %>
+
+      <%= profile_link(nit.nitpicker) %>
+      commented <%= ago(nit.created_at) %>
+      
+    </div>
+  </div>
+</div>
+
+<!--
+<div ng-controller="CommentsCtrl">
+  <ul ng-init='commentThreads = <%= nit.comment_threads.to_json %>'>
+    <li ng-repeat='ct in commentThreads' ng-bind-html-unsafe="ct.html_body"></li>
+  </ul>
+  <a class="btn btn-default" ng-show="hideCommentForm" ng-click="showCommentForm()">add comment</a>
+  <form class="add-comment" ng-hide="hideCommentForm">
+    <textarea cols="58" rows="3" ng-model="commentThread.body"></textarea>
+
+    <button ng-click="addComment(<%= nit.id %>)">Add Comment</button>
+    <button ng-click="hideCommentFormFn()">Close</button>
+  </form>
+</div>
+-->

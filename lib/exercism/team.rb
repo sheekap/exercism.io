@@ -4,8 +4,10 @@ class Team < ActiveRecord::Base
 
   has_many :memberships, ->{ where confirmed: true }, class_name: "TeamMembership", dependent: :destroy
   has_many :unconfirmed_memberships, ->{ where confirmed: false }, class_name: "TeamMembership", dependent: :destroy
+  has_many :confirmed_memberships, ->{ where confirmed: true }, class_name: "TeamMembership", dependent: :destroy
   has_many :members, through: :memberships, source: :user
   has_many :unconfirmed_members, through: :unconfirmed_memberships, source: :user
+  has_many :confirmed_members, through: :confirmed_memberships, source: :user
   has_many :management_contracts, class_name: "TeamManager"
   has_many :managers, through: :management_contracts, source: :user
 
@@ -39,7 +41,7 @@ class Team < ActiveRecord::Base
   def defined_with(options, inviter = nil)
     self.slug = options[:slug]
     self.name = options[:name]
-    recruits = User.find_or_create_in_usernames(options[:usernames].to_s.scan(/\w+/)) if options[:usernames]
+    recruits = User.find_or_create_in_usernames(potential_recruits(options[:usernames])) if options[:usernames]
     recruits = options[:users] if options[:users]
 
     if recruits
@@ -52,7 +54,7 @@ class Team < ActiveRecord::Base
   end
 
   def recruit(usernames, inviter)
-    recruits = User.find_or_create_in_usernames(usernames.to_s.scan(/[\w-]+/)) - self.all_members
+    recruits = User.find_or_create_in_usernames(potential_recruits(usernames.to_s)) - self.all_members
 
     recruits.each do |recruit|
       TeamMembership.create(user: recruit, team: self, inviter: inviter)
@@ -61,6 +63,8 @@ class Team < ActiveRecord::Base
 
   def dismiss(username)
     user = User.find_by_username(username)
+    return if user.nil?
+
     TeamMembership.where(team_id: self.id, user_id: user.id).map(&:destroy)
     self.members.delete(user)
     self.unconfirmed_members.delete(user)
@@ -91,6 +95,10 @@ class Team < ActiveRecord::Base
   end
 
   private
+
+  def potential_recruits(comma_delimited_names)
+    comma_delimited_names.to_s.split(/\s*,\s*/).map(&:strip)
+  end
 
   def normalize_slug
     return unless slug

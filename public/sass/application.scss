@@ -1,0 +1,57 @@
+@import "http://fonts.googleapis.com/css?family=Source+Code+Pro:300,400,500,700";
+
+@import 'base/import';
+@import 'layouts/import';
+
+@import 'vendor/jquery.atwho';
+@import 'vendor/sortable';
+
+.nit-links.nav-pills {
+  margin-top: $line-height-computed;
+  margin-bottom: ($line-height-computed / 2);
+}
+
+.alert-notice {
+  @extend .alert-info;
+}
+
+.alert-error {
+  @extend .alert-danger;
+}
+
+.alert-alert {
+  @extend .alert-warning;
+}
+
+li.alert-row {
+  @include make-row();
+  padding: 5px 0;
+
+  .alert-icon {
+    padding-right: 5px;
+  }
+
+  .delete-alert {
+   float: right;
+   padding-left: 10px;
+  }
+}
+
+.inline {
+  display: inline;
+}
+
+.dropdown-menu {
+  height: auto;
+  max-height: 400px;
+  overflow-x: scroll;
+}
+
+.fuchsia {
+  color: #d81d4e;
+    &:hover {
+      border-left: 6px solid transparent;
+	    border-right: 6px solid transparent;
+      border-top: 6px solid #686A6C;
+    }
+}

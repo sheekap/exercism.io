@@ -1,6 +1,7 @@
 class UserExercise < ActiveRecord::Base
   include Named
   has_many :submissions, ->{ order 'created_at ASC' }
+  has_many :views, foreign_key: 'exercise_id'
 
   # I don't really want the notifications method,
   # just the dependent destroy
@@ -8,8 +9,18 @@ class UserExercise < ActiveRecord::Base
 
   belongs_to :user
 
-  scope :active,    ->{ where(state: ['pending', 'needs_input', 'hibernating']) }
-  scope :completed, ->{ where(state: 'done') }
+  scope :recently_viewed_by, lambda {|user|
+    includes(:user).
+      joins(:views).
+      where('views.user_id': user.id).
+      where('views.last_viewed_at > ?', 30.days.ago).order('views.last_viewed_at DESC')
+  }
+  scope :current, ->{ where(archived: false).where.not(iteration_count: 0).order('last_activity_at DESC') }
+  scope :archived, ->{ where(archived: true).where('iteration_count > 0') }
+  scope :for, lambda { |problem| where(language: problem.track_id, slug: problem.slug) }
+  scope :randomized, ->{ order('RANDOM()') }
+  scope :unsubmitted, ->{ where(archived: false, iteration_count: 0, skipped_at: nil).where.not(fetched_at: nil) }
+  scope :by_activity, ->{ order('last_activity_at DESC') }
 
   before_create do
     self.key ||= Exercism.uuid
@@ -20,41 +31,27 @@ class UserExercise < ActiveRecord::Base
     language
   end
 
-  # close & reopen:
-  # Once v1.0 is launched we can ditch
-  # the state on submission.
-  def close!
-    update_attributes(state: 'done')
-    submissions.last.update_attributes(state: 'done')
+  def update_last_activity(thing)
+    if last_activity_at.nil? || (thing.created_at > last_activity_at)
+      self.last_activity_at = thing.created_at
+      self.last_activity = thing.activity_description
+    end
   end
 
-  def closed?
-    state == 'done'
+  def viewed_by(user)
+    Submission.new(user_id: user.id, user_exercise_id: id).viewed_by(user)
   end
 
-  def reopen!
-    update_attributes(state: 'pending')
-    submissions.last.update_attributes(state: 'pending')
+  def archived?
+    archived
   end
 
-  def open?
-    state == 'pending'
+  def archive!
+    update_attributes(archived: true)
   end
 
-  def unlock!
-    update_attributes(is_nitpicker: true)
-  end
-
-  def completed?
-    state == 'done'
-  end
-
-  def hibernating?
-    state == 'hibernating'
-  end
-
-  def pending?
-    state == 'pending'
+  def unarchive!
+    update_attributes(archived: false)
   end
 
   def nit_count
@@ -63,5 +60,21 @@ class UserExercise < ActiveRecord::Base
 
   def problem
     @problem ||= Problem.new(track_id, slug)
+  end
+
+  def comment_count
+    @comment_count ||= Hash(ActiveRecord::Base.connection.execute(comment_count_sql).to_a.first)["total"].to_i
+  end
+
+  private
+
+  def comment_count_sql
+    <<-SQL
+    SELECT COUNT(c.id) AS total
+    FROM comments c
+    INNER JOIN submissions s
+    ON c.submission_id=s.id
+    WHERE s.user_exercise_id=#{id}
+    SQL
   end
 end

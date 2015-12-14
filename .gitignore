@@ -12,6 +12,7 @@ coverage
 InstalledFiles
 lib/bundler/man
 log
+*.log
 pkg
 rdoc
 spec/reports
@@ -22,7 +23,7 @@ tmp
 db/seeds.sql
 db/schema.sql
 db/migrations.sql
-config/database.yml
+Procfile_Vagrant
 
 # JavaScript
 node_modules
@@ -61,7 +62,7 @@ db/*sqlite
 ./tags
 
 # compiled css
-lib/app/public/css
+public/css
 !.application.css
 !.styleguide.css
 /.project
@@ -70,4 +71,4 @@ lib/app/public/css
 client/npm-debug.log
 client/node_modules
 client/bower_components
-lib/app/public/js/bundle.js
+public/js/bundle.js

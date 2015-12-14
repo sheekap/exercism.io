@@ -1,0 +1,43 @@
+<% if current_user.owns?(submission) %>
+  <div class="btn-group submission-user-actions">
+    <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+      Manage <span class="caret"></span>
+    </button>
+    <ul class="dropdown-menu" role="menu">
+      <li>
+        <% if exercise.archived? %>
+          <form accept-charset="UTF-8" action="/exercises/<%= exercise.key %>/unarchive" method="POST">
+            <button type="submit" name="reopen" class="btn btn-default">Reactivate Exercise</button>
+          </form>
+        <% else %>
+          <form accept-charset="UTF-8" action="/exercises/<%= exercise.key %>/archive" method="POST">
+            <button
+              type="submit"
+              name="done"
+              class="btn btn-default"
+              data-toggle="tooltip"
+              data-placement="bottom"
+              title="I don't need any more feedback on this.">
+              Archive Exercise
+            </button>
+          </form>
+        <% end %>
+      </li>
+
+      <li class="divider"></li>
+
+      <li>
+        <form accept-charset="UTF-8" action="/submissions/<%= submission.key %>" method="POST">
+          <input type="hidden" name="_method" value="delete">
+          <button
+            type="submit"
+            class="btn btn-default"
+            name="delete"
+            onclick="return confirm('Are you sure you want to delete?');">
+            <i class="fa fa-trash"></i> Delete
+          </button>
+        </form>
+      </li>
+    </ul>
+  </div>
+<% end %>
